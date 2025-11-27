@@ -291,7 +291,7 @@ MIT License - Feel free to use this project for learning and commercial purposes
 
 Created as a technical assessment for A-Frame and 3D web development mastery.
 
-**Repository:** [GitHub Link - To be filled]
+**Repository:** https://github.com/amruthbadi0999/3d-jewellery-box.git
 **Live Demo:** https://3d-jewellery-box.vercel.app/
 
 ---
