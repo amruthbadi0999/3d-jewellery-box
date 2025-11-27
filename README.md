@@ -1,4 +1,4 @@
-🎀 3D Interactive Jewellery Box Experience
+💍 3D Interactive Jewellery Box Experience
  
 
 A high-end, interactive 3D web application built with **A-Frame** that showcases jewelry rings with luxury-grade visual fidelity and intuitive interaction mechanics. Features physically-based rendering, continuous drag-to-rotate controls, and smooth animations.
