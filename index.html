@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://aframe.io https://unpkg.com;
+    script-src-elem 'self' 'unsafe-inline' https://aframe.io https://unpkg.com blob:;
+    style-src 'self' 'unsafe-inline' https:;
+    img-src 'self' data: blob: https:;
+    connect-src 'self' https:;
+    media-src *;
+    child-src 'self' blob:;
+    frame-src 'self' blob:;
+    worker-src 'self' blob:;
+    font-src 'self' data: https:;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    block-all-mixed-content;
+  ">
+  <title>3D Jewellery Box</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/aframe-environment-component@1.3.3/dist/aframe-environment-component.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@r128/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/RGBELoader.js"></script>
+  <script src="js/ring-manager.js"></script>
+  <script src="js/ring-focus.js"></script>
+  <script src="js/drag-rotate-y.js"></script>
+  <script src="js/hdri-loader.js"></script>
+  <script src="js/sound-manager.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    
+    /* Close button styles */
+    .close-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 25px;
+      cursor: pointer;
+      display: none;
+      z-index: 1000;
+      font-size: 16px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+      outline: none;
+    }
+    
+    .close-btn:hover {
+      background: rgba(0,0,0,0.9);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+    
+    .close-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* Ring interaction styles */
+    .ring-entity {
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .ring-entity:hover:not(.focused) {
+      transform: scale(1.05);
+    }
+    
+    .ring-entity.focused {
+      cursor: grab;
+      z-index: 100;
+    }
+    
+    .ring-entity.focused:active {
+      cursor: grabbing;
+    }
+    
+    /* Hide the main ring in the middle */
+    a-ring:not(.ring-entity) {
+      display: none !important;
+    }
+    
+    /* Loading screen */
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #1a1a1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: white;
+      font-size: 24px;
+      transition: opacity 0.5s ease;
+    }
+    
+    .loading-text {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .loading-bar-container {
+      width: 200px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .loading-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ff8a00, #e52e71);
+      transition: width 0.3s ease;
+    }
+
+    /* Instructions panel */
+    .instructions {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      max-width: 260px;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 12px !important;
+      line-height: 1.6;
+      z-index: 1100;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      backdrop-filter: blur(8px);
+    }
+
+    .instructions-title {
+      font-weight: 700;
+      font-size: 14px !important;
+      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    .instructions-list {
+      margin: 0;
+      padding-left: 16px;
+    }
+
+    .instructions-list li {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Interaction instructions -->
+  <div class="instructions">
+    <div class="instructions-title">How to view rings</div>
+    <ul class="instructions-list">
+      <li>Click a ring to focus it.</li>
+      <li><strong>Desktop:</strong> Drag with left mouse to rotate Y axis (left/right).</li>
+      <li><strong>Mobile:</strong> Single finger drag to rotate Y axis.</li>
+      <li>Hold <strong>Shift+ left-mouse button </strong>to move the focused ring.</li>
+      <li>Use "Close Ring View" or Esc to return it to the box.</li>
+    </ul>
+  </div>
+  <div class="loading-screen" id="loadingScreen">
+    <div>
+      <div class="loading-text">Loading Jewellery Box</div>
+      <div class="loading-bar-container">
+        <div class="loading-bar" id="loadingBar"></div>
+      </div>
+    </div>
+  </div>
+
+  <a-scene 
+    cursor="rayOrigin: mouse" 
+    raycaster="objects: .interactable"
+    renderer="colorManagement: true; antialias: true; maxCanvasWidth: 2560; maxCanvasHeight: 1600;"
+    xr-mode-ui="enabled: false"
+    ring-manager
+    hdri-loader
+    sound-manager>
+    
+    <!-- Warm jewellery shop environment (soft walls + wooden floor) -->
+    <a-entity environment="
+      preset: default;
+      horizonColor: #fbe9d7;
+      groundColor: #e2c49f;
+      groundTexture: none;
+      skyType: color;
+      skyColor: #fff8e7;
+      lighting: point;
+      lightPosition: 0 4 4;
+      fog: 0.1;
+      grid: none;
+      dressing: none;
+    "></a-entity>
+    
+    <!-- Debug light -->
+    <a-light type="directional" intensity="0.6" position="-1 2 1" castShadow></a-light>
+    <a-light type="ambient" intensity="0.4"></a-light>
+    
+    <!-- Optimized lighting -->
+    <a-light type="ambient" color="#fff" intensity="0.3"></a-light>
+    <a-light type="directional" color="#fff" intensity="0.8" position="-1 1 1" castShadow
+             shadow-map-size-height="1024" shadow-map-size-width="1024"
+             shadow-camera-left="-5" shadow-camera-right="5"
+             shadow-camera-top="5" shadow-camera-bottom="-5"
+             shadow-camera-near="0.5" shadow-camera-far="50"></a-light>
+
+    <!-- Camera (mouse-controlled raycaster on the scene; no in-world cursor entity) -->
+    <a-entity 
+      id="camera" 
+      camera 
+      look-controls 
+      position="0 1.6 2.3"
+      wasd-controls="enabled: false">
+    </a-entity>
+
+    <!-- Main scene lighting -->
+    <a-entity light="type: ambient; intensity: 0.5; color: #ffffff"></a-entity>
+    <a-entity 
+      light="type: directional; intensity: 0.8; color: #ffffff"
+      position="-1 2 1">
+    </a-entity>
+
+    <!-- Jewelry Box -->
+    <a-entity 
+      id="jewelry-box"
+      position="0 0.5 0"
+      scale="0.42 0.42 0.42">
+      <!-- Box base -->
+      <a-box 
+        position="0 0.1 0" 
+        width="2" 
+        height="0.2" 
+        depth="1.5" 
+        shadow="receive: true"
+        material="color: #8B4513; metalness: 0.3; roughness: 0.8">
+      </a-box>
+      
+      <!-- Box sides -->
+      <a-box 
+        position="0 0.3 0" 
+        width="2.2" 
+        height="0.4" 
+        depth="1.7" 
+        material="color: #A0522D; metalness: 0.2; roughness: 0.7"
+        shadow="cast: true; receive: true">
+      </a-box>
+
+      <!-- Box interior -->
+      <a-box 
+        position="0 0.25 0" 
+        width="1.9" 
+        height="0.35" 
+        depth="1.4" 
+        material="color: #5D4037; metalness: 0.1; roughness: 0.9"
+        shadow="cast: false; receive: true">
+      </a-box>
+
+      <!-- Ring 1 - Silver Ring -->
+      <a-entity 
+        id="ring1" 
+        position="-0.7 1 -2"
+        rotation="0 0 0">
+        <!-- Hook / nail behind ring -->
+        <a-cylinder
+          position="0 0 -0.08"
+          radius="0.02"
+          height="0.15"
+          material="color: #ff8fab; metalness: 0.8; roughness: 0.2; emissive: #ff8fab; emissiveIntensity: 0.3"
+          shadow="cast: true; receive: true">
+        </a-cylinder>
+        <!-- Silver band with engraved pattern -->
+        <a-torus 
+          class="interactable ring"
+          ring-focus
+          drag-rotate-y
+          radius="0.32" 
+          radius-tubular="0.045" 
+          segments-radial="32"
+          segments-tubular="12"
+          material="shader: standard; color: #FFFFFF; metalness: 1; roughness: 0.08; envMapIntensity: 1.5;"
+          shadow="cast: true">
+        </a-torus>
+        <!-- Diamond stone -->
+        <a-sphere
+          position="0 0.08 0"
+          radius="0.06"
+          material="shader: standard; color: #f3f6ff; metalness: 0.0; roughness: 0.05; envMapIntensity: 1.2;"
+          shadow="cast: true">
+        </a-sphere>
+      </a-entity>
+
+      <!-- Ring 2 - Gold Ring -->
+      <a-entity 
+        id="ring2" 
+        position="0 1.1 -2"
+        rotation="0 30 0">
+        <!-- Hook / nail behind ring -->
+        <a-cylinder
+          position="0 0 -0.08"
+          radius="0.02"
+          height="0.15"
+          material="color: #ff8fab; metalness: 0.8; roughness: 0.2; emissive: #ff8fab; emissiveIntensity: 0.3"
+          shadow="cast: true; receive: true">
+        </a-cylinder>
+        <!-- Gold band with twisted design -->
+        <a-torus 
+          class="interactable ring"
+          ring-focus
+          drag-rotate-y
+          radius="0.3" 
+          radius-tubular="0.04" 
+          segments-radial="32"
+          arc="360"
+          segments-tubular="12"
+          material="shader: standard; color: #FFD700; metalness: 1; roughness: 0.08; envMapIntensity: 1.8;"
+          geometry="curveSegments: 8"
+          shadow="cast: true">
+        </a-torus>
+        <!-- Red gemstone -->
+        <a-sphere
+          position="0 0.09 0"
+          radius="0.055"
+          material="shader: standard; color: #CC0033; metalness: 0.0; roughness: 0.1; envMapIntensity: 1.2;"
+          shadow="cast: true">
+        </a-sphere>
+      </a-entity>
+
+      <!-- Ring 3 - Rose gold twisted band (controlled as a group) -->
+      <a-entity 
+        id="ring3" 
+        class="interactable ring"
+        ring-focus
+        drag-rotate-y
+        position="0.7 1 -2"
+        rotation="0 60 0">
+        <!-- Hook / nail behind ring -->
+        <a-cylinder
+          position="0 0 -0.08"
+          radius="0.02"
+          height="0.15"
+          material="color: #ff8fab; metalness: 0.8; roughness: 0.2; emissive: #ff8fab; emissiveIntensity: 0.3"
+          shadow="cast: true; receive: true">
+        </a-cylinder>
+        <!-- Outer band (primary clickable geometry) -->
+        <a-torus 
+          class="interactable ring"
+          radius="0.36" 
+          radius-tubular="0.04" 
+          segments-radial="32"
+          segments-tubular="12"
+          material="shader: standard; color: #E0BFB8; metalness: 1; roughness: 0.1; envMapIntensity: 1.6;"
+          shadow="cast: true">
+        </a-torus>
+        <!-- Inner band -->
+        <a-torus 
+          radius="0.34" 
+          radius-tubular="0.03" 
+          rotation="15 0 0"
+          segments-radial="32"
+          segments-tubular="12"
+          material="shader: standard; color: #D4A5A5; metalness: 1; roughness: 0.12; envMapIntensity: 1.4;"
+          shadow="cast: true">
+        </a-torus>
+      </a-entity>
+    </a-entity>
+
+    <!-- Close Button -->
+    <button id="closeBtn" class="close-btn">Close Ring View</button>
+  </a-scene>
+
+  <script>
+    // Simulate loading
+    let progress = 0;
+    const loadingBar = document.getElementById('loadingBar');
+    const loadingScreen = document.getElementById('loadingScreen');
+    
+    const loadingInterval = setInterval(() => {
+      progress += Math.random() * 15;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(loadingInterval);
+        setTimeout(() => {
+          loadingScreen.style.opacity = '0';
+          setTimeout(() => {
+            loadingScreen.style.display = 'none';
+          }, 500);
+        }, 300);
+      }
+      loadingBar.style.width = `${progress}%`;
+    }, 100);
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      const scene = document.querySelector('a-scene');
+      if (scene) {
+        scene.style.width = '100%';
+        scene.style.height = '100vh';
+      }
+    });
+
+    // Add click handler for the close button
+    document.getElementById('closeBtn').addEventListener('click', function() {
+      const ringManager = document.querySelector('a-scene').systems['ring-manager'];
+      if (ringManager && ringManager.activeRing) {
+        ringManager.activeRing.components['ring-focus'].returnToBox();
+      }
+    });
+  </script>
+</body>
+</html>
