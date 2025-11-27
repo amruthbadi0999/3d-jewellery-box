@@ -195,7 +195,7 @@ http-server .
 1. Push code to GitHub repository
 2. Enable GitHub Pages in Settings → Pages
 3. Select `main` branch as source
-4. Live at: `https://yourusername.github.io/jewellery-box`
+4. Live at: https://3d-jewellery-box.vercel.app/
 
 ### Netlify Setup
 1. Connect GitHub repo to Netlify
@@ -292,7 +292,7 @@ MIT License - Feel free to use this project for learning and commercial purposes
 Created as a technical assessment for A-Frame and 3D web development mastery.
 
 **Repository:** [GitHub Link - To be filled]
-**Live Demo:** [Netlify/GitHub Pages Link - To be filled]
+**Live Demo:** https://3d-jewellery-box.vercel.app/
 
 ---
 
